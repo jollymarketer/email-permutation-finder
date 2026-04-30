@@ -44,9 +44,15 @@ def verify(email: str, api_key: str, mv_timeout: int = 10) -> dict:
             raise MVAuthError(f"Million Verifier rejected API key (HTTP {r.status_code}): {r.text[:200]}")
 
         if r.status_code == 429:
-            retry_after = int(r.headers.get("Retry-After", "5"))
+            try:
+                retry_after = int(r.headers.get("Retry-After", "5"))
+            except ValueError:
+                # Retry-After may be an HTTP-date (RFC 7231) instead of delta-seconds.
+                # Fall back to default rather than crashing.
+                retry_after = 5
             time.sleep(retry_after)
-            continue  # does NOT consume a retry attempt
+            # 429 advances the attempt counter, so a sustained rate-limit terminates after MAX_RETRIES+1 calls (same bound as 5xx)
+            continue
 
         if r.status_code >= 500:
             if attempt < MAX_RETRIES:
@@ -57,7 +63,14 @@ def verify(email: str, api_key: str, mv_timeout: int = 10) -> dict:
         if not (200 <= r.status_code < 300):
             return {"email": email, "status": "error", "raw": {"http_status": r.status_code, "body": r.text[:200]}}
 
-        body = r.json()
+        try:
+            body = r.json()
+        except ValueError as e:
+            return {
+                "email": email,
+                "status": "error",
+                "raw": {"error": f"non-json response body: {e}", "body": r.text[:200]},
+            }
         return {
             "email": email,
             "status": _canonicalize(body.get("result", "")),

@@ -83,3 +83,32 @@ def test_verify_respects_retry_after_on_429():
         result = MV.verify("x@y.com", api_key="fake")
     assert result["status"] == "ok"
     mock_sleep.assert_any_call(2)
+
+
+def test_verify_handles_non_json_200_response():
+    """A 200 OK with malformed body should return an error dict, not crash."""
+    with patch("_mv_client.requests.get") as mock_get:
+        bad = MagicMock()
+        bad.status_code = 200
+        bad.json.side_effect = ValueError("not json")
+        bad.text = "<html>maintenance</html>"
+        bad.headers = {}
+        mock_get.return_value = bad
+        result = MV.verify("x@y.com", api_key="fake")
+    assert result["status"] == "error"
+    assert "non-json" in result["raw"].get("error", "").lower() or "json" in result["raw"].get("error", "").lower()
+
+
+def test_verify_retry_after_with_http_date_falls_back_to_default():
+    """Retry-After can be HTTP-date format per RFC 7231 — should not crash."""
+    with patch("_mv_client.requests.get") as mock_get, \
+         patch("_mv_client.time.sleep") as mock_sleep:
+        mock_get.side_effect = [
+            _mock_response({"err": "rate limited"}, status=429,
+                           headers={"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}),
+            _mock_response({"result": "ok"}),
+        ]
+        result = MV.verify("x@y.com", api_key="fake")
+    assert result["status"] == "ok"
+    # Should have slept the default fallback (5s), not crashed
+    mock_sleep.assert_any_call(5)
