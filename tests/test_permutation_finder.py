@@ -75,3 +75,35 @@ def test_process_contact_max_attempts_2_caps_calls():
     assert result["mv_attempts"] == 2
     assert result["email_verdict"] == "not_found"
     assert mock_verify.call_count == 2
+
+
+import json
+from pathlib import Path
+
+
+def test_cache_load_returns_empty_dict_when_file_missing(tmp_path):
+    cache_path = tmp_path / "cache.json"
+    cache = PF.load_cache(cache_path)
+    assert cache == {}
+
+
+def test_cache_load_returns_dict_when_file_exists(tmp_path):
+    cache_path = tmp_path / "cache.json"
+    payload = {"eric|nowinski|growthx.com": {"email": "eric@growthx.com", "email_verdict": "valid"}}
+    cache_path.write_text(json.dumps(payload), encoding="utf-8")
+    cache = PF.load_cache(cache_path)
+    assert cache == payload
+
+
+def test_cache_save_writes_atomically(tmp_path):
+    cache_path = tmp_path / "cache.json"
+    payload = {"k1": {"v": 1}}
+    PF.save_cache(cache_path, payload)
+    assert json.loads(cache_path.read_text(encoding="utf-8")) == payload
+
+
+def test_cache_key_deterministic_after_normalization():
+    k1 = PF.cache_key("Eric", "Nowinski", "Growthx.COM")
+    k2 = PF.cache_key("eric", "nowinski", "growthx.com")
+    k3 = PF.cache_key("ERIC", "NoWiNsKi", "https://www.growthx.com/")
+    assert k1 == k2 == k3

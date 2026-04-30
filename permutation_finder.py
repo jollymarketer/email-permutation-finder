@@ -78,3 +78,34 @@ def _result(
         "email_verdict": verdict,
         "error_reason": error_reason,
     }
+
+
+import json
+from pathlib import Path
+
+
+def cache_key(first_name: str, last_name: str, company_domain: str) -> str:
+    """Stable cache key from normalized inputs."""
+    fn = _permutations.normalize_name(first_name)
+    ln = _permutations.normalize_name(last_name)
+    dom = _permutations.normalize_domain(company_domain)
+    return f"{fn}|{ln}|{dom}"
+
+
+def load_cache(cache_path) -> dict:
+    cache_path = Path(cache_path)
+    if not cache_path.is_file():
+        return {}
+    try:
+        return json.loads(cache_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def save_cache(cache_path, cache: dict) -> None:
+    """Atomic save: write to .tmp, then rename."""
+    cache_path = Path(cache_path)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = cache_path.with_suffix(cache_path.suffix + ".tmp")
+    tmp.write_text(json.dumps(cache, indent=2), encoding="utf-8")
+    tmp.replace(cache_path)
