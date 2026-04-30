@@ -1,5 +1,8 @@
 # tests/test_permutation_finder.py
+import json
+from pathlib import Path
 from unittest.mock import patch
+
 import permutation_finder as PF
 
 
@@ -75,10 +78,6 @@ def test_process_contact_max_attempts_2_caps_calls():
     assert result["mv_attempts"] == 2
     assert result["email_verdict"] == "not_found"
     assert mock_verify.call_count == 2
-
-
-import json
-from pathlib import Path
 
 
 def test_cache_load_returns_empty_dict_when_file_missing(tmp_path):

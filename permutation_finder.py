@@ -8,6 +8,9 @@ CLI:
 See docs/specs/2026-04-30-email-permutation-finder-design.md for the full design.
 """
 
+import json
+from pathlib import Path
+
 import _permutations
 import _mv_client
 
@@ -78,10 +81,6 @@ def _result(
         "email_verdict": verdict,
         "error_reason": error_reason,
     }
-
-
-import json
-from pathlib import Path
 
 
 def cache_key(first_name: str, last_name: str, company_domain: str) -> str:
