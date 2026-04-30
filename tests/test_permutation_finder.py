@@ -184,3 +184,37 @@ def test_run_batch_persists_cache_after_run(tmp_path):
         PF.run_batch(contacts, mv_api_key="fake", max_attempts=5, cache_path=cache_path, concurrency=1)
     cache = PF.load_cache(cache_path)
     assert PF.cache_key("Eric", "Nowinski", "growthx.com") in cache
+
+
+def test_run_batch_continues_on_worker_exception(tmp_path):
+    """If process_contact raises an unexpected exception, the batch continues and the row is marked error."""
+    cache_path = tmp_path / "cache.json"
+    contacts = [
+        {"first_name": "Eric", "last_name": "Nowinski", "company_domain": "growthx.com"},
+        {"first_name": "Bad",  "last_name": "Row",      "company_domain": "boom.com"},
+        {"first_name": "Lisa", "last_name": "Mueller",  "company_domain": "acme.de"},
+    ]
+
+    def fake_process(first_name, last_name, company_domain, mv_api_key, max_attempts):
+        if company_domain == "boom.com":
+            raise RuntimeError("simulated worker crash")
+        return {
+            "email": f"{first_name.lower()}@{company_domain}",
+            "email_source": "permutation",
+            "permutation_used": "firstname",
+            "mv_status": "ok",
+            "mv_attempts": 1,
+            "email_verdict": "valid",
+            "error_reason": "",
+        }
+
+    with patch("permutation_finder.process_contact", side_effect=fake_process):
+        results = PF.run_batch(contacts, mv_api_key="fake", max_attempts=5,
+                               cache_path=cache_path, concurrency=2)
+
+    assert len(results) == 3
+    assert results[0]["email_verdict"] == "valid"
+    assert results[1]["email_verdict"] == "error"
+    assert "RuntimeError" in results[1]["error_reason"]
+    assert "simulated worker crash" in results[1]["error_reason"]
+    assert results[2]["email_verdict"] == "valid"

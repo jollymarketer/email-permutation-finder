@@ -176,6 +176,12 @@ def run_batch(
 
     Cache writes happen ONLY in this coordinator function (single-writer pattern) — workers never touch
     the cache directly. This avoids lost-update races without needing a lock.
+
+    Worker exceptions are caught per-row: if process_contact raises, the row is recorded with
+    email_verdict="error" and error_reason="worker_exception: <Type>: <message>", and the batch
+    continues. This prevents one bad row from killing all unsaved progress since the last cache
+    checkpoint. Note: this means email_verdict has 5 possible values (valid, catchall_domain,
+    not_found, skipped, error).
     """
     cache = load_cache(cache_path)
     results: list[dict] = [None] * len(contacts)
@@ -190,13 +196,19 @@ def run_batch(
 
     def _work(item):
         idx, c = item
-        out = process_contact(
-            first_name=c.get("first_name", ""),
-            last_name=c.get("last_name", ""),
-            company_domain=c.get("company_domain", ""),
-            mv_api_key=mv_api_key,
-            max_attempts=max_attempts,
-        )
+        try:
+            out = process_contact(
+                first_name=c.get("first_name", ""),
+                last_name=c.get("last_name", ""),
+                company_domain=c.get("company_domain", ""),
+                mv_api_key=mv_api_key,
+                max_attempts=max_attempts,
+            )
+        except Exception as e:
+            out = _result(
+                verdict="error",
+                error_reason=f"worker_exception: {type(e).__name__}: {e}",
+            )
         return idx, c, out
 
     completed = 0
