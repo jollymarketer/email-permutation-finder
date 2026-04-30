@@ -149,7 +149,7 @@ CSV writer that preserves all input columns + appends:
 | `permutation_used` | str / empty | Pattern label (e.g. `firstname.lastname`) |
 | `mv_status` | str | `ok` / `catch_all` / `invalid` / `unknown` / `error` / `not_found` |
 | `mv_attempts` | int | 1–5 |
-| `email_verdict` | str | `valid` / `catchall_domain` / `not_found` / `skipped` |
+| `email_verdict` | str | `valid` / `catchall_domain` / `not_found` / `skipped` / `error` |
 | `error_reason` | str / empty | `missing_field` / `personal_email_domain` / empty |
 
 ## CLI

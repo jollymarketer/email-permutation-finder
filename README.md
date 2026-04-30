@@ -64,7 +64,7 @@ Input columns + these:
 | `permutation_used` | pattern label (`firstname.lastname`, etc.) |
 | `mv_status` | `ok` / `catch_all` / `invalid` / `unknown` / `error` / `not_found` |
 | `mv_attempts` | 1–5 |
-| `email_verdict` | `valid` / `catchall_domain` / `not_found` / `skipped` |
+| `email_verdict` | `valid` / `catchall_domain` / `not_found` / `skipped` / `error` |
 | `error_reason` | `missing_field` / `personal_email_domain` / empty |
 
 ## CLI flags
