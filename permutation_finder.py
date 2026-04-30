@@ -8,11 +8,19 @@ CLI:
 See docs/specs/2026-04-30-email-permutation-finder-design.md for the full design.
 """
 
+import csv as _csv
 import json
 from pathlib import Path
 
 import _permutations
 import _mv_client
+
+
+REQUIRED_INPUT_COLUMNS = ("first_name", "last_name", "company_domain")
+ADDED_OUTPUT_COLUMNS = (
+    "email", "email_source", "permutation_used",
+    "mv_status", "mv_attempts", "email_verdict", "error_reason",
+)
 
 
 def process_contact(
@@ -108,3 +116,46 @@ def save_cache(cache_path, cache: dict) -> None:
     tmp = cache_path.with_suffix(cache_path.suffix + ".tmp")
     tmp.write_text(json.dumps(cache, indent=2), encoding="utf-8")
     tmp.replace(cache_path)
+
+
+def _normalize_header(h: str) -> str:
+    return (h or "").strip().lower().replace(" ", "_")
+
+
+def read_input_csv(path) -> list[dict]:
+    """Read a CSV. Lowercases + replaces spaces in headers (e.g. 'First Name' -> 'first_name')."""
+    rows: list[dict] = []
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        reader = _csv.DictReader(f)
+        normalized_fieldnames = [_normalize_header(h) for h in (reader.fieldnames or [])]
+        missing = [c for c in REQUIRED_INPUT_COLUMNS if c not in normalized_fieldnames]
+        if missing:
+            raise ValueError(f"Input CSV missing required columns: {missing}")
+        for raw in reader:
+            normalized = {_normalize_header(k): v for k, v in raw.items()}
+            rows.append(normalized)
+    return rows
+
+
+def write_output_csv(path, rows: list[dict]) -> None:
+    """Write rows to CSV. Field order = input columns first, then added columns."""
+    if not rows:
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            f.write(",".join(REQUIRED_INPUT_COLUMNS + ADDED_OUTPUT_COLUMNS) + "\n")
+        return
+    all_keys: list[str] = []
+    seen: set[str] = set()
+    for k in REQUIRED_INPUT_COLUMNS:
+        if k in rows[0]:
+            all_keys.append(k); seen.add(k)
+    for r in rows:
+        for k in r.keys():
+            if k not in seen and k not in ADDED_OUTPUT_COLUMNS:
+                all_keys.append(k); seen.add(k)
+    for k in ADDED_OUTPUT_COLUMNS:
+        all_keys.append(k); seen.add(k)
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = _csv.DictWriter(f, fieldnames=all_keys, extrasaction="ignore")
+        writer.writeheader()
+        for r in rows:
+            writer.writerow(r)

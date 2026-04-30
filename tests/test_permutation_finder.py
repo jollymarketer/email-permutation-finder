@@ -1,4 +1,5 @@
 # tests/test_permutation_finder.py
+import csv
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -106,3 +107,42 @@ def test_cache_key_deterministic_after_normalization():
     k2 = PF.cache_key("eric", "nowinski", "growthx.com")
     k3 = PF.cache_key("ERIC", "NoWiNsKi", "https://www.growthx.com/")
     assert k1 == k2 == k3
+
+
+def test_read_input_csv_lowercases_headers(tmp_path):
+    p = tmp_path / "in.csv"
+    p.write_text("First Name,Last Name,Company Domain\nEric,Nowinski,growthx.com\n", encoding="utf-8")
+    rows = PF.read_input_csv(p)
+    assert rows == [{"first_name": "Eric", "last_name": "Nowinski", "company_domain": "growthx.com"}]
+
+
+def test_read_input_csv_preserves_extra_columns(tmp_path):
+    p = tmp_path / "in.csv"
+    p.write_text("first_name,last_name,company_domain,linkedin_url\nEric,Nowinski,growthx.com,https://li/in/eric\n", encoding="utf-8")
+    rows = PF.read_input_csv(p)
+    assert rows[0]["linkedin_url"] == "https://li/in/eric"
+
+
+def test_read_input_csv_rejects_missing_required_columns(tmp_path):
+    p = tmp_path / "in.csv"
+    p.write_text("first_name,last_name\nEric,Nowinski\n", encoding="utf-8")
+    import pytest
+    with pytest.raises(ValueError, match="company_domain"):
+        PF.read_input_csv(p)
+
+
+def test_write_output_csv_includes_input_and_added_columns(tmp_path):
+    out = tmp_path / "out.csv"
+    rows = [{
+        "first_name": "Eric", "last_name": "Nowinski", "company_domain": "growthx.com",
+        "linkedin_url": "https://li/in/eric",
+        "email": "eric@growthx.com", "email_source": "permutation",
+        "permutation_used": "firstname", "mv_status": "ok",
+        "mv_attempts": 2, "email_verdict": "valid", "error_reason": "",
+    }]
+    PF.write_output_csv(out, rows)
+    with open(out, newline="", encoding="utf-8") as f:
+        rd = list(csv.DictReader(f))
+    assert rd[0]["linkedin_url"] == "https://li/in/eric"
+    assert rd[0]["email"] == "eric@growthx.com"
+    assert rd[0]["email_verdict"] == "valid"
