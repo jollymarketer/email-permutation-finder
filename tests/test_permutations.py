@@ -147,3 +147,23 @@ def test_is_free_email_domain_detects_dach_providers():
     assert P.is_free_email_domain("tutanota.com") is True
     assert P.is_free_email_domain("tutanota.de") is True
     assert P.is_free_email_domain("tuta.io") is True
+
+
+def test_generate_permutations_deduplicates_when_first_name_is_single_char():
+    """Single-char first names cause firstname.lastname == f.lastname; dedup keeps the first label."""
+    result = P.generate_permutations("X", "Lastname", "dom.com")
+    emails = [email for _, email in result]
+    # All emails must be unique
+    assert len(emails) == len(set(emails)), f"Duplicates found: {emails}"
+    # The kept label for x.lastname@dom.com should be the first one ("firstname.lastname")
+    matching = [(label, email) for label, email in result if email == "x.lastname@dom.com"]
+    assert len(matching) == 1
+    assert matching[0][0] == "firstname.lastname"
+
+
+def test_generate_permutations_dedup_preserves_normal_case():
+    """When all 5 patterns are distinct, all 5 are returned."""
+    result = P.generate_permutations("Eric", "Nowinski", "growthx.com")
+    assert len(result) == 5
+    emails = [email for _, email in result]
+    assert len(emails) == len(set(emails))

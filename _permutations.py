@@ -64,13 +64,20 @@ def generate_permutations(first_name: str, last_name: str, domain: str) -> list[
     fi = fn[0]
     li = ln[0]
 
-    return [
+    candidates = [
         ("firstname.lastname", f"{fn}.{ln}@{dom}"),
         ("firstname",          f"{fn}@{dom}"),
         ("f.lastname",         f"{fi}.{ln}@{dom}"),
         ("firstnamelastname",  f"{fn}{ln}@{dom}"),
         ("firstname.l",        f"{fn}.{li}@{dom}"),
     ]
+    seen = set()
+    deduped = []
+    for label, email in candidates:
+        if email not in seen:
+            seen.add(email)
+            deduped.append((label, email))
+    return deduped
 
 
 FREE_EMAIL_DOMAINS = frozenset([
