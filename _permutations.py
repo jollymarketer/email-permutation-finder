@@ -44,3 +44,30 @@ def normalize_domain(domain: str) -> str:
     for sep in ("/", "?", "#", ":"):
         s = s.split(sep, 1)[0]
     return s
+
+
+def generate_permutations(first_name: str, last_name: str, domain: str) -> list[tuple[str, str]]:
+    """Return ordered list of (pattern_label, email) tuples — top 5 patterns.
+
+    Pattern labels are stable identifiers used in the permutation_used output
+    column. Do not change them without bumping a major version.
+
+    Order is fixed by hit-rate priority for DACH B2B (firstname.lastname first).
+    """
+    fn = normalize_name(first_name)
+    ln = normalize_name(last_name)
+    dom = normalize_domain(domain)
+
+    if not fn or not ln or not dom:
+        return []
+
+    fi = fn[0]
+    li = ln[0]
+
+    return [
+        ("firstname.lastname", f"{fn}.{ln}@{dom}"),
+        ("firstname",          f"{fn}@{dom}"),
+        ("f.lastname",         f"{fi}.{ln}@{dom}"),
+        ("firstnamelastname",  f"{fn}{ln}@{dom}"),
+        ("firstname.l",        f"{fn}.{li}@{dom}"),
+    ]

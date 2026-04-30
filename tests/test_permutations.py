@@ -80,3 +80,38 @@ def test_normalize_domain_idempotent_with_nested_www():
     once = P.normalize_domain("https://www.acme.com:443/path?x=1#a")
     twice = P.normalize_domain(once)
     assert once == twice == "acme.com"
+
+
+def test_generate_permutations_top_5_in_fixed_order():
+    result = P.generate_permutations("Eric", "Nowinski", "growthx.com")
+    expected = [
+        ("firstname.lastname", "eric.nowinski@growthx.com"),
+        ("firstname",          "eric@growthx.com"),
+        ("f.lastname",         "e.nowinski@growthx.com"),
+        ("firstnamelastname",  "ericnowinski@growthx.com"),
+        ("firstname.l",        "eric.n@growthx.com"),
+    ]
+    assert result == expected
+
+
+def test_generate_permutations_normalizes_inputs():
+    result = P.generate_permutations("Müller", "Schäfer", "ACME.COM")
+    assert result[0] == ("firstname.lastname", "mueller.schaefer@acme.com")
+
+
+def test_generate_permutations_strips_protocol_in_domain():
+    result = P.generate_permutations("Eric", "Nowinski", "https://growthx.com/")
+    assert result[0][1].endswith("@growthx.com")
+
+
+def test_generate_permutations_handles_hyphenated_first_name():
+    result = P.generate_permutations("Anne-Marie", "Schmidt", "acme.com")
+    assert result[0] == ("firstname.lastname", "anne-marie.schmidt@acme.com")
+    assert result[2] == ("f.lastname", "a.schmidt@acme.com")
+    assert result[4] == ("firstname.l", "anne-marie.s@acme.com")
+
+
+def test_generate_permutations_empty_input_returns_empty_list():
+    assert P.generate_permutations("", "Nowinski", "acme.com") == []
+    assert P.generate_permutations("Eric", "", "acme.com") == []
+    assert P.generate_permutations("Eric", "Nowinski", "") == []
