@@ -71,3 +71,22 @@ def generate_permutations(first_name: str, last_name: str, domain: str) -> list[
         ("firstnamelastname",  f"{fn}{ln}@{dom}"),
         ("firstname.l",        f"{fn}.{li}@{dom}"),
     ]
+
+
+FREE_EMAIL_DOMAINS = frozenset([
+    "gmail.com", "googlemail.com",
+    "yahoo.com", "yahoo.de", "yahoo.co.uk", "yahoo.fr",
+    "outlook.com", "outlook.de",
+    "hotmail.com", "hotmail.de", "hotmail.fr",
+    "live.com", "live.de",
+    "gmx.de", "gmx.net", "gmx.com", "gmx.at", "gmx.ch",
+    "web.de", "t-online.de",
+    "aol.com",
+    "icloud.com", "me.com", "mac.com",
+    "proton.me", "protonmail.com",
+])
+
+
+def is_free_email_domain(domain: str) -> bool:
+    """True if domain is a known consumer free-email provider."""
+    return normalize_domain(domain) in FREE_EMAIL_DOMAINS

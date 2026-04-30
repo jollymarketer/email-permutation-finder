@@ -115,3 +115,22 @@ def test_generate_permutations_empty_input_returns_empty_list():
     assert P.generate_permutations("", "Nowinski", "acme.com") == []
     assert P.generate_permutations("Eric", "", "acme.com") == []
     assert P.generate_permutations("Eric", "Nowinski", "") == []
+
+
+def test_is_free_email_domain_detects_common_providers():
+    assert P.is_free_email_domain("gmail.com") is True
+    assert P.is_free_email_domain("gmx.de") is True
+    assert P.is_free_email_domain("web.de") is True
+    assert P.is_free_email_domain("t-online.de") is True
+    assert P.is_free_email_domain("proton.me") is True
+
+
+def test_is_free_email_domain_normalizes_input():
+    assert P.is_free_email_domain("https://Gmail.com/") is True
+    assert P.is_free_email_domain("  GMX.DE  ") is True
+
+
+def test_is_free_email_domain_rejects_business_domains():
+    assert P.is_free_email_domain("acme.com") is False
+    assert P.is_free_email_domain("growthx.com") is False
+    assert P.is_free_email_domain("jolly-marketer.de") is False
