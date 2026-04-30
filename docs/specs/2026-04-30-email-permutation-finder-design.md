@@ -215,7 +215,7 @@ Each step is independently runnable. No coupling between this tool and the persi
 
 ## Distribution
 
-- **Repository:** `https://github.com/<your-org>/email-permutation-finder` (public, MIT)
+- **Repository:** `https://github.com/jollymarketer/email-permutation-finder` (public, MIT)
 - **Install:** `git clone … && pip install -r requirements.txt`
 - **No PyPI release** for v1 — clone-and-run is sufficient for the target audience (small ops/SDR teams).
 

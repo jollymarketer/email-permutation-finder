@@ -27,7 +27,7 @@ Free-email domains (Gmail, GMX, Outlook, etc.) are skipped without any API call.
 ## Install
 
 ```bash
-git clone https://github.com/<your-org>/email-permutation-finder.git
+git clone https://github.com/jollymarketer/email-permutation-finder.git
 cd email-permutation-finder
 pip install -r requirements.txt
 cp .env.example .env
