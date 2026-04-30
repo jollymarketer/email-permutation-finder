@@ -134,3 +134,16 @@ def test_is_free_email_domain_rejects_business_domains():
     assert P.is_free_email_domain("acme.com") is False
     assert P.is_free_email_domain("growthx.com") is False
     assert P.is_free_email_domain("jolly-marketer.de") is False
+
+
+def test_is_free_email_domain_detects_dach_providers():
+    """German consumer ISPs and privacy providers."""
+    assert P.is_free_email_domain("freenet.de") is True
+    assert P.is_free_email_domain("arcor.de") is True
+    assert P.is_free_email_domain("mail.de") is True
+    assert P.is_free_email_domain("mailbox.org") is True
+    assert P.is_free_email_domain("posteo.de") is True
+    assert P.is_free_email_domain("posteo.net") is True
+    assert P.is_free_email_domain("tutanota.com") is True
+    assert P.is_free_email_domain("tutanota.de") is True
+    assert P.is_free_email_domain("tuta.io") is True

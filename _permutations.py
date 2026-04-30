@@ -84,6 +84,12 @@ FREE_EMAIL_DOMAINS = frozenset([
     "aol.com",
     "icloud.com", "me.com", "mac.com",
     "proton.me", "protonmail.com",
+    # DACH consumer ISPs
+    "freenet.de", "arcor.de",
+    "mail.de", "mailbox.org",
+    # Privacy providers
+    "posteo.de", "posteo.net",
+    "tutanota.com", "tutanota.de", "tuta.io",
 ])
 
 
