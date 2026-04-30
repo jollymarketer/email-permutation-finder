@@ -25,3 +25,20 @@ def normalize_name(name: str) -> str:
     s = "".join(ch for ch in s if not unicodedata.combining(ch))
     s = s.replace("'", "").replace("’", "").replace("`", "")
     return s
+
+
+def normalize_domain(domain: str) -> str:
+    """Lowercase, strip protocol, www prefix, trailing path, and whitespace."""
+    if not domain:
+        return ""
+    s = domain.strip().lower()
+    if not s:
+        return ""
+    for prefix in ("https://", "http://"):
+        if s.startswith(prefix):
+            s = s[len(prefix):]
+            break
+    if s.startswith("www."):
+        s = s[4:]
+    s = s.split("/", 1)[0]
+    return s

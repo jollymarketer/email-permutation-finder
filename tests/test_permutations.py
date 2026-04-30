@@ -31,3 +31,30 @@ def test_normalize_name_strips_apostrophes_keeps_hyphens():
 def test_normalize_name_empty_returns_empty():
     assert P.normalize_name("") == ""
     assert P.normalize_name("   ") == ""
+
+
+def test_normalize_domain_lowercases():
+    assert P.normalize_domain("Acme.COM") == "acme.com"
+
+
+def test_normalize_domain_strips_protocol():
+    assert P.normalize_domain("https://acme.com") == "acme.com"
+    assert P.normalize_domain("http://acme.com") == "acme.com"
+
+
+def test_normalize_domain_strips_www():
+    assert P.normalize_domain("www.acme.com") == "acme.com"
+    assert P.normalize_domain("https://www.acme.com") == "acme.com"
+
+
+def test_normalize_domain_strips_trailing_path():
+    assert P.normalize_domain("acme.com/") == "acme.com"
+    assert P.normalize_domain("acme.com/about") == "acme.com"
+
+
+def test_normalize_domain_strips_whitespace():
+    assert P.normalize_domain("  acme.com  ") == "acme.com"
+
+
+def test_normalize_domain_empty_returns_empty():
+    assert P.normalize_domain("") == ""
