@@ -28,7 +28,7 @@ def normalize_name(name: str) -> str:
 
 
 def normalize_domain(domain: str) -> str:
-    """Lowercase, strip protocol, www prefix, trailing path, and whitespace."""
+    """Lowercase, strip protocol, www prefix, port, path, querystring, fragment, and whitespace."""
     if not domain:
         return ""
     s = domain.strip().lower()
@@ -38,7 +38,9 @@ def normalize_domain(domain: str) -> str:
         if s.startswith(prefix):
             s = s[len(prefix):]
             break
-    if s.startswith("www."):
+    while s.startswith("www."):
         s = s[4:]
-    s = s.split("/", 1)[0]
+    # Strip path, querystring, fragment, port (in this order)
+    for sep in ("/", "?", "#", ":"):
+        s = s.split(sep, 1)[0]
     return s

@@ -58,3 +58,25 @@ def test_normalize_domain_strips_whitespace():
 
 def test_normalize_domain_empty_returns_empty():
     assert P.normalize_domain("") == ""
+
+
+def test_normalize_domain_strips_port():
+    assert P.normalize_domain("acme.com:8080") == "acme.com"
+    assert P.normalize_domain("https://acme.com:443") == "acme.com"
+
+
+def test_normalize_domain_strips_querystring():
+    assert P.normalize_domain("acme.com?x=1") == "acme.com"
+    assert P.normalize_domain("acme.com/path?x=1") == "acme.com"
+
+
+def test_normalize_domain_strips_fragment():
+    assert P.normalize_domain("acme.com#anchor") == "acme.com"
+
+
+def test_normalize_domain_idempotent_with_nested_www():
+    assert P.normalize_domain("www.www.acme.com") == "acme.com"
+    # Idempotency property
+    once = P.normalize_domain("https://www.acme.com:443/path?x=1#a")
+    twice = P.normalize_domain(once)
+    assert once == twice == "acme.com"
