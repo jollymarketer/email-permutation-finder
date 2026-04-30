@@ -218,3 +218,55 @@ def test_run_batch_continues_on_worker_exception(tmp_path):
     assert "RuntimeError" in results[1]["error_reason"]
     assert "simulated worker crash" in results[1]["error_reason"]
     assert results[2]["email_verdict"] == "valid"
+
+
+def test_cli_dry_run_writes_output_without_calling_mv(tmp_path):
+    in_csv = tmp_path / "in.csv"
+    out_csv = tmp_path / "out.csv"
+    in_csv.write_text("first_name,last_name,company_domain\nEric,Nowinski,growthx.com\n", encoding="utf-8")
+
+    with patch("permutation_finder._mv_client.verify") as mock_verify:
+        import sys as _sys
+        _sys.argv = [
+            "permutation_finder.py",
+            "--input", str(in_csv),
+            "--output", str(out_csv),
+            "--cache", str(tmp_path / "cache.json"),
+            "--dry-run",
+        ]
+        rc = PF.main()
+
+    assert rc == 0
+    assert mock_verify.call_count == 0
+    assert out_csv.exists()
+    content = out_csv.read_text(encoding="utf-8")
+    assert "eric.nowinski@growthx.com" in content
+
+
+def test_cli_aborts_when_no_api_key(tmp_path, monkeypatch):
+    monkeypatch.delenv("MILLIONVERIFIER_API_KEY", raising=False)
+    in_csv = tmp_path / "in.csv"
+    in_csv.write_text("first_name,last_name,company_domain\nE,N,a.com\n", encoding="utf-8")
+    import sys as _sys
+    _sys.argv = [
+        "permutation_finder.py",
+        "--input", str(in_csv),
+        "--output", str(tmp_path / "out.csv"),
+        "--cache", str(tmp_path / "cache.json"),
+    ]
+    rc = PF.main()
+    assert rc != 0
+
+
+def test_cli_rejects_invalid_max_attempts(tmp_path):
+    in_csv = tmp_path / "in.csv"
+    in_csv.write_text("first_name,last_name,company_domain\nE,N,a.com\n", encoding="utf-8")
+    import sys as _sys
+    _sys.argv = [
+        "permutation_finder.py",
+        "--input", str(in_csv),
+        "--output", str(tmp_path / "out.csv"),
+        "--max-attempts", "20",
+    ]
+    rc = PF.main()
+    assert rc != 0

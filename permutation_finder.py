@@ -8,8 +8,23 @@ CLI:
 See docs/specs/2026-04-30-email-permutation-finder-design.md for the full design.
 """
 
+import os
+
+# Load .env from the repo root (walking up from this file). Standard python-dotenv.
+try:
+    from pathlib import Path as _Path
+    from dotenv import load_dotenv
+    for _parent in _Path(__file__).resolve().parents:
+        if (_parent / ".env").is_file():
+            load_dotenv(_parent / ".env")
+            break
+except ImportError:
+    pass  # dotenv is optional; env vars can also come from the shell
+
+import argparse
 import csv as _csv
 import json
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -223,3 +238,68 @@ def run_batch(
 
     save_cache(cache_path, cache)
     return results
+
+
+def main() -> int:
+    """CLI entry point. Returns process exit code."""
+    parser = argparse.ArgumentParser(
+        description="Email permutation finder (top 5 patterns + Million Verifier).",
+    )
+    parser.add_argument("--input", required=True, help="Input CSV path")
+    parser.add_argument("--output", required=True, help="Output CSV path")
+    parser.add_argument("--cache", default=".tmp/permutation_cache.json", help="Resume cache JSON path")
+    parser.add_argument("--max-attempts", type=int, default=5, help="Max MV calls per contact (1-10)")
+    parser.add_argument("--concurrency", type=int, default=10, help="Parallel contacts in flight")
+    parser.add_argument("--dry-run", action="store_true", help="Generate permutations only, skip MV")
+    args = parser.parse_args()
+
+    if not (1 <= args.max_attempts <= 10):
+        print("ERROR: --max-attempts must be 1-10", file=sys.stderr)
+        return 2
+
+    contacts = read_input_csv(args.input)
+    print(f"[input] {len(contacts)} contacts loaded from {args.input}")
+
+    if args.dry_run:
+        rows = []
+        for c in contacts:
+            perms = _permutations.generate_permutations(
+                c.get("first_name", ""), c.get("last_name", ""), c.get("company_domain", "")
+            )
+            for label, email in perms[:args.max_attempts]:
+                rows.append({**c, "email": email, "email_source": "permutation",
+                             "permutation_used": label, "mv_status": "", "mv_attempts": 0,
+                             "email_verdict": "dry_run", "error_reason": ""})
+        write_output_csv(args.output, rows)
+        print(f"[dry-run] wrote {len(rows)} candidate permutations to {args.output}")
+        return 0
+
+    mv_key = os.environ.get("MILLIONVERIFIER_API_KEY", "")
+    if not mv_key:
+        print("ERROR: MILLIONVERIFIER_API_KEY not set in environment / .env", file=sys.stderr)
+        return 2
+
+    rows = run_batch(
+        contacts=contacts,
+        mv_api_key=mv_key,
+        max_attempts=args.max_attempts,
+        cache_path=args.cache,
+        concurrency=args.concurrency,
+    )
+
+    write_output_csv(args.output, rows)
+
+    by_verdict: dict[str, int] = {}
+    total_calls = 0
+    for r in rows:
+        by_verdict[r.get("email_verdict", "")] = by_verdict.get(r.get("email_verdict", ""), 0) + 1
+        total_calls += int(r.get("mv_attempts") or 0)
+    print(f"[output] wrote {len(rows)} rows to {args.output}")
+    print(f"[stats] verdicts: {by_verdict}")
+    print(f"[stats] total MV calls: {total_calls}  (~${total_calls * 0.0004:.4f} at $0.0004/credit)")
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
