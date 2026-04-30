@@ -10,6 +10,7 @@ See docs/specs/2026-04-30-email-permutation-finder-design.md for the full design
 
 import csv as _csv
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import _permutations
@@ -159,3 +160,54 @@ def write_output_csv(path, rows: list[dict]) -> None:
         writer.writeheader()
         for r in rows:
             writer.writerow(r)
+
+
+CACHE_SAVE_EVERY = 50
+
+
+def run_batch(
+    contacts: list[dict],
+    mv_api_key: str,
+    max_attempts: int,
+    cache_path,
+    concurrency: int = 10,
+) -> list[dict]:
+    """Process all contacts. Cache hits skip MV. Returns one result row per input contact, in input order.
+
+    Cache writes happen ONLY in this coordinator function (single-writer pattern) — workers never touch
+    the cache directly. This avoids lost-update races without needing a lock.
+    """
+    cache = load_cache(cache_path)
+    results: list[dict] = [None] * len(contacts)
+
+    to_process: list[tuple[int, dict]] = []
+    for idx, c in enumerate(contacts):
+        key = cache_key(c.get("first_name", ""), c.get("last_name", ""), c.get("company_domain", ""))
+        if key in cache:
+            results[idx] = {**c, **cache[key]}
+        else:
+            to_process.append((idx, c))
+
+    def _work(item):
+        idx, c = item
+        out = process_contact(
+            first_name=c.get("first_name", ""),
+            last_name=c.get("last_name", ""),
+            company_domain=c.get("company_domain", ""),
+            mv_api_key=mv_api_key,
+            max_attempts=max_attempts,
+        )
+        return idx, c, out
+
+    completed = 0
+    with ThreadPoolExecutor(max_workers=concurrency) as ex:
+        for idx, c, out in ex.map(_work, to_process):
+            merged = {**c, **out}
+            results[idx] = merged
+            cache[cache_key(c.get("first_name", ""), c.get("last_name", ""), c.get("company_domain", ""))] = out
+            completed += 1
+            if completed % CACHE_SAVE_EVERY == 0:
+                save_cache(cache_path, cache)
+
+    save_cache(cache_path, cache)
+    return results

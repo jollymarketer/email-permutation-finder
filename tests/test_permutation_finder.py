@@ -146,3 +146,41 @@ def test_write_output_csv_includes_input_and_added_columns(tmp_path):
     assert rd[0]["linkedin_url"] == "https://li/in/eric"
     assert rd[0]["email"] == "eric@growthx.com"
     assert rd[0]["email_verdict"] == "valid"
+
+
+def test_run_batch_processes_all_contacts_uses_cache(tmp_path):
+    cache_path = tmp_path / "cache.json"
+    pre = {
+        PF.cache_key("Cached", "Person", "acme.com"): {
+            "email": "cached@acme.com", "email_source": "permutation",
+            "permutation_used": "firstname", "mv_status": "ok", "mv_attempts": 1,
+            "email_verdict": "valid", "error_reason": "",
+        }
+    }
+    PF.save_cache(cache_path, pre)
+    contacts = [
+        {"first_name": "Cached", "last_name": "Person", "company_domain": "acme.com"},
+        {"first_name": "Eric",   "last_name": "Nowinski", "company_domain": "growthx.com"},
+    ]
+    with patch("permutation_finder._mv_client.verify") as mock_verify:
+        mock_verify.return_value = _mv_result("ok")
+        results = PF.run_batch(
+            contacts, mv_api_key="fake", max_attempts=5,
+            cache_path=cache_path, concurrency=2,
+        )
+    assert len(results) == 2
+    assert mock_verify.call_count == 1
+    cached_result = next(r for r in results if r["first_name"] == "Cached")
+    assert cached_result["email"] == "cached@acme.com"
+    fresh_result = next(r for r in results if r["first_name"] == "Eric")
+    assert fresh_result["email"] == "eric.nowinski@growthx.com"
+
+
+def test_run_batch_persists_cache_after_run(tmp_path):
+    cache_path = tmp_path / "cache.json"
+    contacts = [{"first_name": "Eric", "last_name": "Nowinski", "company_domain": "growthx.com"}]
+    with patch("permutation_finder._mv_client.verify") as mock_verify:
+        mock_verify.return_value = _mv_result("ok")
+        PF.run_batch(contacts, mv_api_key="fake", max_attempts=5, cache_path=cache_path, concurrency=1)
+    cache = PF.load_cache(cache_path)
+    assert PF.cache_key("Eric", "Nowinski", "growthx.com") in cache
