@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.11+, `requests` for HTTP, `python-dotenv` for env loading, `concurrent.futures.ThreadPoolExecutor` for batching, `pytest` for tests, `unittest.mock` for HTTP mocking.
 
-**Repo root:** `c:/Users/richa/Jolly_Claude_Code/Jolly Automations/email-permutation-finder/`
+**Repo root:** `c:/Users/richa/Jolly_Claude_Code/Jolly Automations/Jolly-Email-Permutation-Finder/`
 
 **File Layout (target after all tasks):**
 
@@ -1476,7 +1476,7 @@ Cheapest layer of email enrichment for B2B contacts. Tries 5 common name+domain 
 
 Canonical local clone:
 ```
-c:/Users/richa/Jolly_Claude_Code/Jolly Automations/email-permutation-finder/permutation_finder.py
+c:/Users/richa/Jolly_Claude_Code/Jolly Automations/Jolly-Email-Permutation-Finder/permutation_finder.py
 ```
 
 Public repo: `https://github.com/<your-org>/email-permutation-finder` (MIT).
@@ -1485,13 +1485,13 @@ Public repo: `https://github.com/<your-org>/email-permutation-finder` (MIT).
 
 ```bash
 # Dry run (no MV calls — verifies patterns and CSV plumbing only)
-python "c:/Users/richa/Jolly_Claude_Code/Jolly Automations/email-permutation-finder/permutation_finder.py" \
+python "c:/Users/richa/Jolly_Claude_Code/Jolly Automations/Jolly-Email-Permutation-Finder/permutation_finder.py" \
   --input leads.csv \
   --output found.csv \
   --dry-run
 
 # Real run
-python "c:/Users/richa/Jolly_Claude_Code/Jolly Automations/email-permutation-finder/permutation_finder.py" \
+python "c:/Users/richa/Jolly_Claude_Code/Jolly Automations/Jolly-Email-Permutation-Finder/permutation_finder.py" \
   --input leads.csv \
   --output found.csv
 ```
@@ -1545,7 +1545,7 @@ Million Verifier ~$0.0004/credit:
 
 Full design at:
 ```
-c:/Users/richa/Jolly_Claude_Code/Jolly Automations/email-permutation-finder/docs/specs/2026-04-30-email-permutation-finder-design.md
+c:/Users/richa/Jolly_Claude_Code/Jolly Automations/Jolly-Email-Permutation-Finder/docs/specs/2026-04-30-email-permutation-finder-design.md
 ```
 ````
 

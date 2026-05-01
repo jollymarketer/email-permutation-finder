@@ -74,7 +74,7 @@ email-permutation-finder/
         └── 2026-04-30-email-permutation-finder.md
 ```
 
-Local clone path: `c:/Users/richa/Jolly_Claude_Code/Jolly Automations/email-permutation-finder/`
+Local clone path: `c:/Users/richa/Jolly_Claude_Code/Jolly Automations/Jolly-Email-Permutation-Finder/`
 
 ## Components
 
