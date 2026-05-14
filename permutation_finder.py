@@ -83,7 +83,7 @@ def process_contact(
 
     return _result(
         verdict="not_found",
-        mv_status=last_status or "not_found",
+        mv_status=last_status,
         mv_attempts=len(permutations),
     )
 
