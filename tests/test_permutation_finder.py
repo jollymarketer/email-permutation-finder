@@ -195,7 +195,7 @@ def test_run_batch_continues_on_worker_exception(tmp_path):
         {"first_name": "Lisa", "last_name": "Mueller",  "company_domain": "acme.de"},
     ]
 
-    def fake_process(first_name, last_name, company_domain, mv_api_key, max_attempts):
+    def fake_process(first_name, last_name, company_domain, mv_api_key, max_attempts, bb_api_key=""):
         if company_domain == "boom.com":
             raise RuntimeError("simulated worker crash")
         return {
@@ -204,6 +204,8 @@ def test_run_batch_continues_on_worker_exception(tmp_path):
             "permutation_used": "firstname",
             "mv_status": "ok",
             "mv_attempts": 1,
+            "bb_status": "",
+            "bb_attempts": 0,
             "email_verdict": "valid",
             "error_reason": "",
         }

@@ -30,12 +30,14 @@ from pathlib import Path
 
 import _permutations
 import _mv_client
+import _bb_client
 
 
 REQUIRED_INPUT_COLUMNS = ("first_name", "last_name", "company_domain")
 ADDED_OUTPUT_COLUMNS = (
     "email", "email_source", "permutation_used",
-    "mv_status", "mv_attempts", "email_verdict", "error_reason",
+    "mv_status", "mv_attempts", "bb_status", "bb_attempts",
+    "email_verdict", "error_reason",
 )
 
 
@@ -45,8 +47,19 @@ def process_contact(
     company_domain: str,
     mv_api_key: str,
     max_attempts: int,
+    bb_api_key: str = "",
 ) -> dict:
-    """Run the permutation waterfall for one contact. Returns a result row dict."""
+    """Run permutation waterfall for one contact: MV per candidate; BB fallback on catch_all.
+
+    Per candidate (top max_attempts permutations):
+      - MV=ok        -> valid, stop
+      - MV=catch_all -> switch validator to BB for this and remaining candidates
+      - MV=other     -> next candidate (still MV)
+    Once BB active:
+      - BB=deliverable -> valid, stop
+      - BB=risky/undeliverable/unknown -> next candidate (still BB)
+    If all permutations exhausted: catchall_no_valid (if BB activated) or not_found.
+    """
     if not first_name or not first_name.strip() \
             or not last_name or not last_name.strip() \
             or not company_domain or not company_domain.strip():
@@ -61,30 +74,67 @@ def process_contact(
 
     permutations = permutations[:max_attempts]
 
-    last_status = ""
-    for attempt_idx, (label, candidate_email) in enumerate(permutations, start=1):
-        mv = _mv_client.verify(candidate_email, api_key=mv_api_key)
-        last_status = mv["status"]
+    bb_active = False
+    mv_attempts = 0
+    bb_attempts = 0
+    last_mv_status = ""
+    last_bb_status = ""
 
-        if mv["status"] == "ok":
-            return _result(
-                verdict="valid",
-                email=candidate_email,
-                permutation_used=label,
-                mv_status="ok",
-                mv_attempts=attempt_idx,
-            )
-        if mv["status"] == "catch_all":
-            return _result(
-                verdict="catchall_domain",
-                mv_status="catch_all",
-                mv_attempts=attempt_idx,
-            )
+    for label, candidate_email in permutations:
+        if not bb_active:
+            mv_attempts += 1
+            mv = _mv_client.verify(candidate_email, api_key=mv_api_key)
+            last_mv_status = mv["status"]
 
+            if mv["status"] == "ok":
+                return _result(
+                    verdict="valid",
+                    email=candidate_email,
+                    permutation_used=label,
+                    mv_status="ok",
+                    mv_attempts=mv_attempts,
+                )
+            if mv["status"] == "catch_all":
+                if not bb_api_key:
+                    # No BB key configured, behave as legacy: stop on first catch_all
+                    return _result(
+                        verdict="catchall_domain",
+                        mv_status="catch_all",
+                        mv_attempts=mv_attempts,
+                        error_reason="bb_api_key_missing",
+                    )
+                bb_active = True
+                # Fall through and validate the SAME candidate with BB
+
+        if bb_active:
+            bb_attempts += 1
+            bb = _bb_client.verify(candidate_email, api_key=bb_api_key)
+            last_bb_status = bb["result"]
+
+            if bb["result"] == "deliverable":
+                return _result(
+                    verdict="valid",
+                    email=candidate_email,
+                    permutation_used=label,
+                    mv_status=last_mv_status,
+                    mv_attempts=mv_attempts,
+                    bb_status="deliverable",
+                    bb_attempts=bb_attempts,
+                )
+            # risky / undeliverable / unknown / error -> try next candidate with BB
+
+    if bb_active:
+        return _result(
+            verdict="catchall_no_valid",
+            mv_status=last_mv_status or "catch_all",
+            mv_attempts=mv_attempts,
+            bb_status=last_bb_status or "unknown",
+            bb_attempts=bb_attempts,
+        )
     return _result(
         verdict="not_found",
-        mv_status=last_status or "not_found",
-        mv_attempts=len(permutations),
+        mv_status=last_mv_status or "not_found",
+        mv_attempts=mv_attempts,
     )
 
 
@@ -94,14 +144,18 @@ def _result(
     permutation_used: str = "",
     mv_status: str = "",
     mv_attempts: int = 0,
+    bb_status: str = "",
+    bb_attempts: int = 0,
     error_reason: str = "",
 ) -> dict:
     return {
         "email": email,
-        "email_source": "permutation" if email else "",
+        "email_source": "permutation_bb" if email and bb_status == "deliverable" else ("permutation" if email else ""),
         "permutation_used": permutation_used,
         "mv_status": mv_status,
         "mv_attempts": mv_attempts,
+        "bb_status": bb_status,
+        "bb_attempts": bb_attempts,
         "email_verdict": verdict,
         "error_reason": error_reason,
     }
@@ -186,6 +240,7 @@ def run_batch(
     max_attempts: int,
     cache_path,
     concurrency: int = 10,
+    bb_api_key: str = "",
 ) -> list[dict]:
     """Process all contacts. Cache hits skip MV. Returns one result row per input contact, in input order.
 
@@ -218,6 +273,7 @@ def run_batch(
                 company_domain=c.get("company_domain", ""),
                 mv_api_key=mv_api_key,
                 max_attempts=max_attempts,
+                bb_api_key=bb_api_key,
             )
         except Exception as e:
             out = _result(
@@ -269,6 +325,7 @@ def main() -> int:
             for label, email in perms[:args.max_attempts]:
                 rows.append({**c, "email": email, "email_source": "permutation",
                              "permutation_used": label, "mv_status": "", "mv_attempts": 0,
+                             "bb_status": "", "bb_attempts": 0,
                              "email_verdict": "dry_run", "error_reason": ""})
         write_output_csv(args.output, rows)
         print(f"[dry-run] wrote {len(rows)} candidate permutations to {args.output}")
@@ -279,24 +336,32 @@ def main() -> int:
         print("ERROR: MILLIONVERIFIER_API_KEY not set in environment / .env", file=sys.stderr)
         return 2
 
+    bb_key = os.environ.get("BOUNCEBAN_API_KEY", "")
+    if not bb_key:
+        print("WARNING: BOUNCEBAN_API_KEY not set; catchall fallback disabled (legacy behavior).", file=sys.stderr)
+
     rows = run_batch(
         contacts=contacts,
         mv_api_key=mv_key,
         max_attempts=args.max_attempts,
         cache_path=args.cache,
         concurrency=args.concurrency,
+        bb_api_key=bb_key,
     )
 
     write_output_csv(args.output, rows)
 
     by_verdict: dict[str, int] = {}
-    total_calls = 0
+    total_mv = 0
+    total_bb = 0
     for r in rows:
         by_verdict[r.get("email_verdict", "")] = by_verdict.get(r.get("email_verdict", ""), 0) + 1
-        total_calls += int(r.get("mv_attempts") or 0)
+        total_mv += int(r.get("mv_attempts") or 0)
+        total_bb += int(r.get("bb_attempts") or 0)
     print(f"[output] wrote {len(rows)} rows to {args.output}")
     print(f"[stats] verdicts: {by_verdict}")
-    print(f"[stats] total MV calls: {total_calls}  (~${total_calls * 0.0004:.4f} at $0.0004/credit)")
+    print(f"[stats] total MV calls: {total_mv}  (~${total_mv * 0.0004:.4f} at $0.0004/credit)")
+    print(f"[stats] total BB calls: {total_bb}  (~${total_bb * 0.002:.4f} at $0.002/credit)")
 
     return 0
 
